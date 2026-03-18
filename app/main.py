@@ -4,7 +4,7 @@ import pathlib
 from typing import Dict, Optional
 from zoneinfo import ZoneInfo
 
-from fastapi import Body, FastAPI, HTTPException, Request
+from fastapi import BackgroundTasks, Body, FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -33,6 +33,11 @@ from .status_store import (
 
 class RefreshRequest(BaseModel):
     key: Optional[str] = None
+
+
+class PassagemRequest(BaseModel):
+    """Métricas manuais quando o Jira retorna 403."""
+    metrics: Optional[Dict[str, int]] = None
 
 
 class SlackReportRequest(BaseModel):
@@ -102,23 +107,37 @@ logger = logging.getLogger(__name__)
 ALERT_FAILURE_THRESHOLD = 3  # alertar após N falhas consecutivas
 
 
-def _run_passagem_turno(turno: Optional[str] = None) -> Optional[Dict]:
+def _run_passagem_turno(
+    turno: Optional[str] = None,
+    metrics_override: Optional[Dict[str, int]] = None,
+) -> Optional[Dict]:
     """Atualiza métricas e envia passagem ao canal.
 
     - Webhook (SLACK_WEBHOOK_URL): envia só o relatório. Analistas respondem manualmente na thread.
     - Bot API (SLACK_BOT_TOKEN + SLACK_CHANNEL_ID): fluxo completo com botões, modais, DM.
-    turno: T1, T2 ou T3 (para incluir pontos repassados, só no modo Bot)."""
-    try:
-        metrics_service.refresh_all()
-    except Exception as exc:
-        logger.warning("Jira indisponível ao atualizar métricas: %s", exc)
+    turno: T1, T2 ou T3 (para incluir pontos repassados, só no modo Bot).
+    metrics_override: quando o Jira retorna 403, use métricas manuais {total: 10, crises: 2, ...}."""
+    if not metrics_override:
+        try:
+            metrics_service.refresh_all()
+        except Exception as exc:
+            logger.warning("Jira indisponível ao atualizar métricas: %s", exc)
     if not slack_notifier.is_configured:
         set_last_passagem_failure("Slack não configurado")
         return None
 
     report_cfg = config.get("report", {})
     analyst = os.getenv("ANALYST_SLACK") or config.get("schedule", {}).get("analyst") or None
-    metrics = metrics_service.get_all()
+    metrics_config = config.get("metrics", {})
+
+    if metrics_override:
+        metrics = {
+            k: {"key": k, "name": cfg.get("name", k), "value": v, "jql": cfg.get("jql", "")}
+            for k, v in metrics_override.items()
+            if (cfg := metrics_config.get(k)) and v is not None
+        }
+    else:
+        metrics = metrics_service.get_all()
     previous = metrics_service.get_previous_values()
     jira_url = config.get("jira", {}).get("base_url") or jira_base_url
 
@@ -274,15 +293,46 @@ def refresh(req: Optional[RefreshRequest] = Body(default=None)) -> Dict:
     return {"status": "ok", "last_updated": metrics_service.last_updated_iso}
 
 
+@app.post("/slack/slash/passagem-turno")
+async def slack_slash_passagem(request: Request, background_tasks: BackgroundTasks) -> Dict:
+    """Recebe o comando /passagem-turno do Slack. Qualquer analista pode usar."""
+    signing_secret = os.getenv("SLACK_SIGNING_SECRET")
+    if not signing_secret:
+        raise HTTPException(status_code=500, detail="SLACK_SIGNING_SECRET não configurado para slash command")
+    raw_body = await request.body()
+    if not verify_slack_signature(signing_secret, request.headers, raw_body):
+        raise HTTPException(status_code=401, detail="Assinatura inválida")
+
+    if not slack_notifier.is_configured:
+        return {
+            "response_type": "ephemeral",
+            "text": "Slack não configurado. Configure SLACK_WEBHOOK_URL.",
+        }
+
+    background_tasks.add_task(lambda: _run_passagem_turno())
+    return {
+        "response_type": "ephemeral",
+        "text": "Enviando passagem de turno ao canal...",
+    }
+
+
+@app.get("/metrics/definitions")
+def get_metrics_definitions() -> Dict[str, str]:
+    """Retorna as definições de métricas (nome exibido por key) para formulário manual."""
+    metrics_config = config.get("metrics", {})
+    return {k: cfg.get("name", k) for k, cfg in metrics_config.items() if cfg.get("enabled", True)}
+
+
 @app.post("/slack/passagem-turno")
-def trigger_passagem_turno() -> Dict:
-    """Dispara manualmente a passagem de turno (refresh + envio ao Slack)."""
+def trigger_passagem_turno(req: Optional[PassagemRequest] = Body(default=None)) -> Dict:
+    """Dispara manualmente a passagem de turno. Aceita métricas manuais no body quando Jira retorna 403."""
     if not slack_notifier.is_configured:
         raise HTTPException(
             status_code=400,
             detail="Slack não configurado. Defina SLACK_WEBHOOK_URL ou SLACK_BOT_TOKEN+SLACK_CHANNEL_ID no .env",
         )
-    result = _run_passagem_turno()
+    metrics_override = req.metrics if req else None
+    result = _run_passagem_turno(metrics_override=metrics_override)
     if result:
         msg = "Passagem de turno enviada"
         url = result.get("url") if isinstance(result, dict) else None

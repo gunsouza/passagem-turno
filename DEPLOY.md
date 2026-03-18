@@ -4,7 +4,31 @@ Guia para rodar o serviço em nuvem, sem depender do seu computador.
 
 ---
 
-## Pré-requisitos
+## Opção 0: GitHub Actions (100% gratuito, sem servidor)
+
+Roda a passagem de turno nos horários 23:50, 08:00 e 16:00 (America/Sao_Paulo) diretamente pelo GitHub. Não precisa de servidor 24/7.
+
+1. **Configurar secrets** no repositório:
+   - GitHub → seu repo → **Settings** → **Secrets and variables** → **Actions**
+   - **New repository secret** para cada um:
+     - `JIRA_BASE_URL` = `https://mercadolibre.atlassian.net`
+     - `JIRA_EMAIL` = seu email
+     - `JIRA_API_TOKEN` = token do Jira
+     - `SLACK_WEBHOOK_URL` = URL do Incoming Webhook
+     - `ANALYST_SLACK` (opcional) = ex: "Automatismo"
+
+2. **Push do código** – o workflow `.github/workflows/passagem-turno.yml` já está pronto.
+
+3. **Pronto.** O workflow roda nos horários:
+   - 23:50 BRT
+   - 08:00 BRT
+   - 16:00 BRT
+
+4. **Disparo manual:** GitHub → **Actions** → **Passagem de Turno** → **Run workflow**.
+
+---
+
+## Pré-requisitos (para Railway/Render/Fly.io)
 
 1. **Repositório no GitHub** – faça push do código:
    ```bash

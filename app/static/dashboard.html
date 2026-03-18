@@ -24,13 +24,15 @@
     .refresh { margin-bottom: 1rem; }
     .refresh button { background: #3b82f6; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; }
     .refresh button:hover { background: #2563eb; }
+    .metrics-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 0.75rem; margin-top: 0.5rem; }
+    .metrics-form label { display: block; font-size: 0.75rem; color: #94a3b8; margin-bottom: 0.25rem; }
+    .metrics-form input { width: 100%; padding: 0.5rem; border-radius: 6px; border: 1px solid #334155; background: #0f172a; color: #e2e8f0; }
   </style>
 </head>
 <body>
   <h1>Passagem de Turno – Dashboard</h1>
   <div class="refresh">
     <button onclick="load()">Atualizar</button>
-    <button onclick="enviarPassagem()" style="margin-left: 0.5rem; background: #22c55e;">Enviar passagem</button>
   </div>
 
   <section class="status" id="status">
@@ -45,6 +47,13 @@
     </div>
   </section>
 
+  <section class="status" id="enviar-section" style="margin-bottom: 2rem;">
+    <h2>Enviar passagem</h2>
+    <p style="color: #94a3b8; font-size: 0.9rem;">Quando o Jira retorna 403, preencha as métricas manualmente e envie.</p>
+    <div id="metrics-form" class="metrics-form"></div>
+    <button id="btn-enviar" onclick="enviarPassagem()" style="margin-top: 1rem; background: #22c55e;">Enviar passagem</button>
+  </section>
+
   <section>
     <h2>Histórico (últimos 14 dias)</h2>
     <div id="history">
@@ -54,12 +63,30 @@
 
   <script>
     const API = '';
+    let metricDefinitions = {};
+
     async function enviarPassagem() {
-      const btn = document.querySelector('button[onclick="enviarPassagem()"]');
+      const metrics = {};
+      for (const [key] of Object.entries(metricDefinitions)) {
+        const val = document.getElementById('m-' + key)?.value?.trim();
+        if (val !== '' && !isNaN(parseInt(val, 10))) {
+          metrics[key] = parseInt(val, 10);
+        }
+      }
+      if (Object.keys(metrics).length === 0) {
+        alert('Preencha pelo menos uma métrica antes de enviar.');
+        return;
+      }
+      const btn = document.getElementById('btn-enviar');
       btn.disabled = true;
       btn.textContent = 'Enviando...';
       try {
-        const r = await fetch(API + '/slack/passagem-turno', { method: 'POST' });
+        const body = { metrics };
+        const r = await fetch(API + '/slack/passagem-turno', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
         const data = await r.json();
         if (r.ok) {
           alert('Passagem enviada ao Slack!');
@@ -73,16 +100,28 @@
         btn.textContent = 'Enviar passagem';
       }
     }
+
     async function load() {
       try {
-        const [metricsRes, statusRes, historyRes] = await Promise.all([
+        const [metricsRes, statusRes, historyRes, defsRes] = await Promise.all([
           fetch(API + '/metrics'),
           fetch(API + '/status'),
-          fetch(API + '/metrics/history?days=14')
+          fetch(API + '/metrics/history?days=14'),
+          fetch(API + '/metrics/definitions'),
         ]);
         const metrics = await metricsRes.json();
         const status = await statusRes.json();
         const history = await historyRes.json();
+        metricDefinitions = await defsRes.json();
+        if (Object.keys(metricDefinitions).length === 0) {
+          document.getElementById('metrics-form').innerHTML = '<p class="err">Não foi possível carregar as métricas. Atualize a página.</p>';
+        } else {
+        const formHtml = Object.entries(metricDefinitions).map(([key, label]) => {
+          const val = metrics[key]?.value ?? '';
+          return `<label for="m-${key}">${label}</label><input type="number" id="m-${key}" min="0" placeholder="0" value="${val}">`;
+        }).join('');
+        document.getElementById('metrics-form').innerHTML = formHtml;
+        }
 
         document.getElementById('status').innerHTML = `
           <h2>Status</h2>
