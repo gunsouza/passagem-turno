@@ -58,8 +58,14 @@ def main() -> int:
                 "value": total,
                 "jql": jql,
             }
+            print(f"  {cfg.get('name', key)}: {total}")
         except Exception as e:
+            import traceback
             print(f"WARNING: Métrica '{key}' falhou: {e}")
+            traceback.print_exc()
+
+    if not metrics:
+        print("ERROR: Nenhuma métrica obtida. Verifique JIRA_* e permissões do token.")
 
     report = config.get("report", {})
     analyst = os.getenv("ANALYST_SLACK") or config.get("schedule", {}).get("analyst", "")
@@ -71,6 +77,8 @@ def main() -> int:
         links=report.get("links", {}),
         jira_base_url=base_url,
     )
+    if not metrics:
+        text += "\n\n⚠️ _Não foi possível obter métricas. Verifique logs do GitHub Actions._"
 
     r = requests.post(
         webhook,
