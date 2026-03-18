@@ -28,7 +28,10 @@
 </head>
 <body>
   <h1>Passagem de Turno – Dashboard</h1>
-  <div class="refresh"><button onclick="load()">Atualizar</button></div>
+  <div class="refresh">
+    <button onclick="load()">Atualizar</button>
+    <button onclick="enviarPassagem()" style="margin-left: 0.5rem; background: #22c55e;">Enviar passagem</button>
+  </div>
 
   <section class="status" id="status">
     <h2>Status</h2>
@@ -51,6 +54,25 @@
 
   <script>
     const API = '';
+    async function enviarPassagem() {
+      const btn = document.querySelector('button[onclick="enviarPassagem()"]');
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+      try {
+        const r = await fetch(API + '/slack/passagem-turno', { method: 'POST' });
+        const data = await r.json();
+        if (r.ok) {
+          alert('Passagem enviada ao Slack!');
+        } else {
+          alert('Erro: ' + (data.detail || data.message || r.status));
+        }
+      } catch (e) {
+        alert('Erro: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Enviar passagem';
+      }
+    }
     async function load() {
       try {
         const [metricsRes, statusRes, historyRes] = await Promise.all([
