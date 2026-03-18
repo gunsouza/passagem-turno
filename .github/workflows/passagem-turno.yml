@@ -1,0 +1,35 @@
+# Passagem de turno - executa nos horários 23:50, 08:00 e 16:00 (America/Sao_Paulo)
+# 100% gratuito - usa GitHub Actions
+
+name: Passagem de Turno
+
+on:
+  schedule:
+    # UTC (America/Sao_Paulo = UTC-3): 23:50 BRT = 02:50 UTC, 08:00 = 11:00 UTC, 16:00 = 19:00 UTC
+    - cron: "50 2 * * *"
+    - cron: "0 11 * * *"
+    - cron: "0 19 * * *"
+  workflow_dispatch:  # Permite disparar manualmente
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests pyyaml
+
+      - name: Run passagem de turno
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_BASE_URL }}
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_API_TOKEN }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          ANALYST_SLACK: ${{ secrets.ANALYST_SLACK }}
+        run: python scripts/run_passagem.py
