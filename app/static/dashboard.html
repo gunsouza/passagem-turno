@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Passagem de Turno – Dashboard</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 1.5rem; background: #0f172a; color: #e2e8f0; }
+    h1 { margin: 0 0 1rem; font-size: 1.5rem; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+    .card { background: #1e293b; border-radius: 8px; padding: 1rem; border-left: 4px solid #3b82f6; }
+    .card .label { font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; }
+    .card .value { font-size: 1.5rem; font-weight: 700; }
+    .status { background: #1e293b; border-radius: 8px; padding: 1rem; margin-bottom: 2rem; }
+    .status h2 { margin: 0 0 0.5rem; font-size: 1rem; }
+    .status .ok { color: #22c55e; }
+    .status .err { color: #ef4444; }
+    table { width: 100%; border-collapse: collapse; background: #1e293b; border-radius: 8px; overflow: hidden; }
+    th, td { padding: 0.5rem 1rem; text-align: left; }
+    th { background: #334155; font-size: 0.75rem; color: #94a3b8; text-transform: uppercase; }
+    tr:nth-child(even) { background: #0f172a; }
+    .loading { color: #94a3b8; }
+    .refresh { margin-bottom: 1rem; }
+    .refresh button { background: #3b82f6; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; cursor: pointer; }
+    .refresh button:hover { background: #2563eb; }
+  </style>
+</head>
+<body>
+  <h1>Passagem de Turno – Dashboard</h1>
+  <div class="refresh"><button onclick="load()">Atualizar</button></div>
+
+  <section class="status" id="status">
+    <h2>Status</h2>
+    <div class="loading">Carregando...</div>
+  </section>
+
+  <section>
+    <h2>Métricas atuais</h2>
+    <div class="grid" id="metrics">
+      <div class="loading">Carregando...</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Histórico (últimos 14 dias)</h2>
+    <div id="history">
+      <div class="loading">Carregando...</div>
+    </div>
+  </section>
+
+  <script>
+    const API = '';
+    async function load() {
+      try {
+        const [metricsRes, statusRes, historyRes] = await Promise.all([
+          fetch(API + '/metrics'),
+          fetch(API + '/status'),
+          fetch(API + '/metrics/history?days=14')
+        ]);
+        const metrics = await metricsRes.json();
+        const status = await statusRes.json();
+        const history = await historyRes.json();
+
+        document.getElementById('status').innerHTML = `
+          <h2>Status</h2>
+          <p>Última passagem: ${status.last_passagem?.at ? new Date(status.last_passagem.at).toLocaleString('pt-BR') : '—'}</p>
+          <p>Sucesso: <span class="${status.last_passagem?.success ? 'ok' : 'err'}">${status.last_passagem?.success ? 'Sim' : 'Não'}</span></p>
+          <p>Próximos horários: ${(status.next_schedule || []).join(', ')}</p>
+          <p>Falhas consecutivas: ${status.consecutive_failures || 0}</p>
+        `;
+
+        const metricsHtml = Object.entries(metrics).map(([k, m]) =>
+          `<div class="card"><div class="label">${m.name || k}</div><div class="value">${m.value ?? '—'}</div></div>`
+        ).join('');
+        document.getElementById('metrics').innerHTML = metricsHtml || '<p>Nenhuma métrica</p>';
+
+        const snapshots = history.snapshots || [];
+        if (snapshots.length === 0) {
+          document.getElementById('history').innerHTML = '<p>Nenhum histórico disponível. Execute refresh para gerar snapshots.</p>';
+        } else {
+          const keys = Object.keys(snapshots[0]?.values || {});
+          const header = ['Data', ...keys.map(k => {
+            const m = metrics[k];
+            return m?.name || k;
+          })].join('</th><th>');
+          const rows = snapshots.map(s => {
+            const vals = keys.map(k => s.values?.[k] ?? '—');
+            return `<tr><td>${s.date}</td><td>${vals.join('</td><td>')}</td></tr>`;
+          }).join('');
+          document.getElementById('history').innerHTML = `<table><thead><tr><th>${header}</th></tr></thead><tbody>${rows}</tbody></table>`;
+        }
+      } catch (e) {
+        document.getElementById('status').innerHTML = `<h2>Status</h2><p class="err">Erro: ${e.message}</p>`;
+        document.getElementById('metrics').innerHTML = '<p class="err">Erro ao carregar métricas</p>';
+        document.getElementById('history').innerHTML = '<p class="err">Erro ao carregar histórico</p>';
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

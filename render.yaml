@@ -1,0 +1,18 @@
+# Render Blueprint - deploy em render.com
+# Conecte o repositório e o Render usará este arquivo
+services:
+  - type: web
+    name: passagem-turno
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: JIRA_BASE_URL
+        sync: false
+      - key: JIRA_EMAIL
+        sync: false
+      - key: JIRA_API_TOKEN
+        sync: false
+      - key: SLACK_WEBHOOK_URL
+        sync: false
+      - key: REFRESH_MINUTES
+        value: "5"

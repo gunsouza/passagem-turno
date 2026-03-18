@@ -1,0 +1,14 @@
+# Credenciais - NUNCA commitar
+.env
+.env.local
+.env.*.local
+
+# Dados locais
+app/data/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/

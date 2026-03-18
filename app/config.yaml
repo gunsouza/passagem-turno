@@ -1,0 +1,57 @@
+jira:
+  base_url: "https://mercadolibre.atlassian.net"
+  email_env: "JIRA_EMAIL"
+  api_token_env: "JIRA_API_TOKEN"
+
+# Métricas do modelo de passagem de turno. Ajuste os status conforme o seu Jira.
+# Use enabled: false para desativar uma métrica sem removê-la.
+# Base: project IS/ISS, Resolution team IS-SHIP-NATS-N1, MLB/MCH
+metrics:
+  total:
+    name: "Total"
+    jql: "project = \"IS\" AND \"Request Type\" != \"Dynalert (IS)\" AND statusCategory != Done AND \"Resolution team IS[Dropdown]\" = IS-SHIP-NATS-N1 AND (\"Pais - Alarm IS[Short text]\" ~ MLB OR \"IS Ubicación\" in aqlFunction(\"Site in (MLB,MCH)\")) AND (labels is EMPTY OR labels not in (Automatico)) OR project = ISS AND issuetype = Vulnerabilidad AND statusCategory != Done AND \"Resolution team IS[Dropdown]\" = IS-SHIP-NATS-N1 AND \"IS Ubicación\" in aqlFunction(\"Site = MLB\") ORDER BY created ASC"
+
+  crises:
+    name: "Crises"
+    jql: "project = SSHP AND \"site afectado shipping[select list (multiple choices)]\" = MLB AND \"severity[dropdown]\" IN (SEV-1, SEV-2, SEV-3) AND created >= -8h AND type = \"Critical Incident\" AND \"owner[select list (multiple choices)]\" IN (is-core-services, is-estandarización-shipping, is-networking-noc, is-networking, is-ops, is-ucs, is-se, is-infraestructura-ucs, IS-Estandarizacion, is-estandarizacion-shipping, is-natis, is-observability, is-ucs-devices)"
+
+  wfs_natis:
+    name: "WFS (NATIS)"
+    jql: "(project = \"IS\" AND \"Request Type\" != \"Dynalert (IS)\" AND statusCategory != Done AND \"Resolution team IS[Dropdown]\" = IS-SHIP-NATS-N1 AND (\"Pais - Alarm IS[Short text]\" ~ MLB OR \"IS Ubicación\" in aqlFunction(\"Site in (MLB,MCH)\")) AND (labels is EMPTY OR labels not in (Automatico)) AND status = \"Waiting for Support\") OR (project = ISS AND issuetype = Vulnerabilidad AND statusCategory != Done AND \"Resolution team IS[Dropdown]\" = IS-SHIP-NATS-N1 AND \"IS Ubicación\" in aqlFunction(\"Site = MLB\") AND status = \"Waiting for Support\") ORDER BY created ASC"
+
+  wfs_p1p2:
+    name: "WFS (P1/P2)"
+    jql: "project IN (\"IS\", ISS) AND status IN (\"Waiting for support\") AND \"resolution team is[dropdown]\" IN (IS-SHIP-NATS-N1, IS-SHIP-FIELDSERVICE) AND \"is site[dropdown]\" = MLB AND priority IN (Highest, High)"
+
+  wfc:
+    name: "WFC"
+    jql: "(project = \"IS\" AND \"Request Type\" != \"Dynalert (IS)\" AND statusCategory != Done AND \"Resolution team IS[Dropdown]\" = IS-SHIP-NATS-N1 AND (\"Pais - Alarm IS[Short text]\" ~ MLB OR \"IS Ubicación\" in aqlFunction(\"Site in (MLB,MCH)\")) AND (labels is EMPTY OR labels not in (Automatico)) AND status = \"Waiting for Customer\") OR (project = ISS AND issuetype = Vulnerabilidad AND statusCategory != Done AND \"Resolution team IS[Dropdown]\" = IS-SHIP-NATS-N1 AND \"IS Ubicación\" in aqlFunction(\"Site = MLB\") AND status = \"Waiting for Customer\") ORDER BY created ASC"
+
+  pending:
+    name: "Pending"
+    jql: "(project = \"IS\" AND \"Request Type\" != \"Dynalert (IS)\" AND statusCategory != Done AND \"Resolution team IS[Dropdown]\" = IS-SHIP-NATS-N1 AND (\"Pais - Alarm IS[Short text]\" ~ MLB OR \"IS Ubicación\" in aqlFunction(\"Site in (MLB,MCH)\")) AND (labels is EMPTY OR labels not in (Automatico)) AND status = \"Pending\") OR (project = ISS AND issuetype = Vulnerabilidad AND statusCategory != Done AND \"Resolution team IS[Dropdown]\" = IS-SHIP-NATS-N1 AND \"IS Ubicación\" in aqlFunction(\"Site = MLB\") AND status = \"Pending\") ORDER BY created ASC"
+
+  em_andamento:
+    name: "Em andamento"
+    jql: "(project = \"IS\" AND \"Request Type\" != \"Dynalert (IS)\" AND statusCategory != Done AND \"Resolution team IS[Dropdown]\" = IS-SHIP-NATS-N1 AND (\"Pais - Alarm IS[Short text]\" ~ MLB OR \"IS Ubicación\" in aqlFunction(\"Site in (MLB,MCH)\")) AND (labels is EMPTY OR labels not in (Automatico)) OR project = ISS AND issuetype = Vulnerabilidad AND statusCategory != Done AND \"Resolution team IS[Dropdown]\" = IS-SHIP-NATS-N1 AND \"IS Ubicación\" in aqlFunction(\"Site = MLB\")) AND status = \"In Progress\" ORDER BY created ASC"
+
+report:
+  title: "Passagem de Turno BR"
+  subtitle: "Passagem de Turno T2"  # ex: T1, T2, T3
+  links: {}
+
+# Horários para envio automático (formato HH:MM)
+schedule:
+  times: ["23:50", "08:00", "16:00"]
+  analyst: "Automatismo"
+  timezone: "America/Sao_Paulo"  # timezone para os horários
+  # Mapeamento horário -> turno (para repassar pontos)
+  turno_map:
+    "08:00": "T1"
+    "16:00": "T2"
+    "23:50": "T3"
+
+# Usuários para receber DM perguntando sobre pontos (Slack User IDs)
+# Ex: ["U01234567", "U89ABCDEF"]
+# Para obter o ID: perfil da pessoa > "Ver perfil" > ⋮ > "Copiar ID do membro"
+dm_users: []
