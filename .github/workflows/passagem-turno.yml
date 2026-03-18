@@ -23,7 +23,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install dependencies
-        run: pip install requests pyyaml
+        run: pip install requests pyyaml slack-sdk
 
       - name: Run passagem de turno
         env:
